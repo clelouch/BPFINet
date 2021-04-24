@@ -20,12 +20,12 @@ OpenCV-Python
 
 ## Training
 ```
-python main.py 
+python deep_supervision_main.py 
 ```
 
 ## Test
 ```
- python3 main.py --mode=test 
+ python deep_supervision_main.py --mode=test 
 ```
 We provide the trained model file ([Baidu](https://drive.google.com/file/d/1bXERDgTKfzkZfXKs8z5vj1QNM3zL-QTL/view?usp=sharing)) [code:]
 
