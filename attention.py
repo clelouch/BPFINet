@@ -3,7 +3,6 @@ from torch import nn
 import torch.nn.functional as F
 
 
-# TODO: when try to set bias=false in conv2d layer, we need to modify the Linear layer as well
 class ChannelAttention(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(ChannelAttention, self).__init__()
@@ -30,11 +29,4 @@ class ChannelAttention(nn.Module):
 
         y1 = y1.expand_as(x).clone()
         y = x * y1
-        # use x or y?
         return F.relu(y + self.conv2(y))
-
-
-if __name__ == '__main__':
-    a = torch.randn((1, 20, 20, 20))
-    ca = ChannelAttention(20, 10)
-    b = ca(a)
