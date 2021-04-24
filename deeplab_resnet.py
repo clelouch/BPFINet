@@ -8,7 +8,6 @@ affine_par = True
 
 
 def conv3x3(in_planes, out_planes, stride=1):
-    "3x3 convolution with padding"
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
 
@@ -118,6 +117,9 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
+    def load_pretrained_model(self, model):
+        self.resnet.load_state_dict(model, strict=False)
+
     def _make_layer(self, block, planes, blocks, stride=1, dilation__=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion or dilation__ == 2 or dilation__ == 4:
@@ -154,61 +156,6 @@ class ResNet(nn.Module):
         tmp_x.append(x)
 
         return tmp_x
-
-
-class ResNet_locate(nn.Module):
-    def __init__(self, block, layers):
-        super(ResNet_locate, self).__init__()
-        self.resnet = ResNet(block, layers)
-        self.in_planes = 512
-        self.out_planes = [512, 256, 256, 128]
-
-        self.ppms_pre = nn.Conv2d(2048, self.in_planes, 1, 1, bias=False)
-        ppms, infos = [], []
-        for ii in [1, 3, 5]:
-            ppms.append(
-                nn.Sequential(nn.AdaptiveAvgPool2d(ii), nn.Conv2d(self.in_planes, self.in_planes, 1, 1, bias=False),
-                              nn.ReLU(inplace=True)))
-        self.ppms = nn.ModuleList(ppms)
-
-        self.ppm_cat = nn.Sequential(nn.Conv2d(self.in_planes * 4, self.in_planes, 3, 1, 1, bias=False),
-                                     nn.ReLU(inplace=True))
-        for ii in self.out_planes:
-            infos.append(nn.Sequential(nn.Conv2d(self.in_planes, ii, 3, 1, 1, bias=False), nn.ReLU(inplace=True)))
-        self.infos = nn.ModuleList(infos)
-
-        for m in self.modules():
-            if isinstance(m, nn.Conv2d):
-                n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, 0.01)
-            elif isinstance(m, nn.BatchNorm2d):
-                m.weight.data.fill_(1)
-                m.bias.data.zero_()
-
-    def load_pretrained_model(self, model):
-        self.resnet.load_state_dict(model, strict=False)
-
-    def forward(self, x):
-        x_size = x.size()[2:]
-        xs = self.resnet(x)
-
-        xs_1 = self.ppms_pre(xs[-1])
-        xls = [xs_1]
-        for k in range(len(self.ppms)):
-            xls.append(F.interpolate(self.ppms[k](xs_1), xs_1.size()[2:], mode='bilinear', align_corners=True))
-        xls = self.ppm_cat(torch.cat(xls, dim=1))
-
-        infos = []
-        for k in range(len(self.infos)):
-            infos.append(self.infos[k](
-                F.interpolate(xls, xs[len(self.infos) - 1 - k].size()[2:], mode='bilinear', align_corners=True)))
-
-        return xs, infos
-
-
-def resnet50_locate():
-    model = ResNet_locate(Bottleneck, [3, 4, 6, 3])
-    return model
 
 
 def resnet50():
