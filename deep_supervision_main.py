@@ -6,23 +6,23 @@ from deep_supervision_solver import Solver
 
 def get_test_info(sal_mode='e'):
     if sal_mode == 'e':
-        image_root = '/home/omnisky/diskB/datasets/SOD_Datasets/ECSSD/images/'
-        image_source = '/home/omnisky/diskB/datasets/SOD_Datasets/ECSSD/test.lst'
+        image_root = 'E:/sal_datasets/ECSSD/images/'
+        image_source = 'E:/sal_datasets/ECSSD/test.lst'
     elif sal_mode == 'p':
-        image_root = '/home/omnisky/diskB/datasets/SOD_Datasets/PASCALS/images/'
-        image_source = '/home/omnisky/diskB/datasets/SOD_Datasets/PASCALS/test.lst'
+        image_root = 'E:/sal_datasets/PASCALS/images/'
+        image_source = 'E:/sal_datasets/PASCALS/test.lst'
     elif sal_mode == 'd':
-        image_root = '/home/omnisky/diskB/datasets/SOD_Datasets/DUTOMRON/images/'
-        image_source = '/home/omnisky/diskB/datasets/SOD_Datasets/DUTOMRON/test.lst'
+        image_root = 'E:/sal_datasets/DUTOMRON/images/'
+        image_source = 'E:/sal_datasets/DUTOMRON/test.lst'
     elif sal_mode == 'h':
-        image_root = '/home/omnisky/diskB/datasets/SOD_Datasets/HKU-IS/images/'
-        image_source = '/home/omnisky/diskB/datasets/SOD_Datasets/HKU-IS/test.lst'
+        image_root = 'E:/sal_datasets/HKU-IS/images/'
+        image_source = 'E:/sal_datasets/HKU-IS/test.lst'
     elif sal_mode == 's':
-        image_root = '/home/omnisky/diskB/datasets/SOD_Datasets/SOD/images/'
-        image_source = '/home/omnisky/diskB/datasets/SOD_Datasets/SOD/test.lst'
+        image_root = 'E:/sal_datasets/SOD/images/'
+        image_source = 'E:/sal_datasets/SOD/test.lst'
     elif sal_mode == 't':
-        image_root = '/home/omnisky/diskB/datasets/SOD_Datasets/DUTS-TE/images/'
-        image_source = '/home/omnisky/diskB/datasets/SOD_Datasets/DUTS-TE/test.lst'
+        image_root = 'E:/sal_datasets/DUTS-TE/images/'
+        image_source = 'E:/sal_datasets/DUTS-TE/test.lst'
 
     return image_root, image_source
 
@@ -39,7 +39,6 @@ def main(config):
         train = Solver(train_loader, None, config)
         train.train()
 
-        # save hyperparameters
         with open('%s/args.txt' % (config.save_folder), 'w') as f:
             for arg in vars(config):
                 print('%s: %s' % (arg, getattr(config, arg)), file=f)
@@ -55,11 +54,9 @@ def main(config):
 
 
 if __name__ == '__main__':
-
-    vgg_path = './pretrained/vgg16_20M.pth'
     resnet_path = './pretrained/resnet50_caffe.pth'
 
-    parser = argparse.ArgumentParser(description="Attention Guided Boundary-aware Network")
+    parser = argparse.ArgumentParser(description="BPFINet")
 
     # Hyper-parameters
     parser.add_argument('--n_color', type=int, default=3)
@@ -70,9 +67,9 @@ if __name__ == '__main__':
     # Training settings
     parser.add_argument('--arch', type=str, default='resnet')  # resnet or vgg
     parser.add_argument('--pretrained_model', type=str, default=resnet_path)
-    parser.add_argument('--epoch', type=int, default=100)
+    parser.add_argument('--epoch', type=int, default=50)
     parser.add_argument('--batch_size', type=int, default=10)
-    parser.add_argument('--num_thread', type=int, default=8)
+    parser.add_argument('--num_thread', type=int, default=4)
     parser.add_argument('--load', type=str, default='')
     parser.add_argument('--save_folder', type=str, default='./deep_supervision_results')
     parser.add_argument('--epoch_save', type=int, default=50)
@@ -80,11 +77,12 @@ if __name__ == '__main__':
     parser.add_argument('--show_every', type=int, default=500)
     parser.add_argument('--weight', type=float, default=5)
     parser.add_argument('--sigma', type=float, default=4)
+    parser.add_argument('--loss_type', type=str, default='triplet')
 
     # Train data
-    parser.add_argument('--train_root', type=str, default='./data/DUTS-TR')
+    parser.add_argument('--train_root', type=str, default='E:/sal_datasets/DUTS-TR')
     parser.add_argument('--train_list', type=str,
-                        default='./data/DUTS-TR/mypair.lst')
+                        default='E:/sal_datasets/DUTS-TR/mypair.lst')
 
     # Testing settings
     parser.add_argument('--model', type=str, default=None)  # Snapshot
@@ -94,9 +92,7 @@ if __name__ == '__main__':
     # Misc
     parser.add_argument('--mode', type=str, default='train', choices=['train', 'test'])
 
-    # Device
     config = parser.parse_args()
-
 
     if not os.path.exists(config.save_folder):
         os.mkdir(config.save_folder)
