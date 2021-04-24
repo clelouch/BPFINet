@@ -1,15 +1,8 @@
 import torch
 from torch import nn
-from torch.nn import init
 import torch.nn.functional as F
-import math
-import numpy as np
 from attention import ChannelAttention as CA
 from deeplab_resnet import resnet50
-from vgg import vgg16
-
-config_vgg = {'convert': [[128, 256, 512, 512, 512], [64, 128, 256, 512, 512]],
-              'score': 128}  # no convert layer, no conv6
 
 config_resnet = {'convert': [[64, 256, 512, 1024, 2048], [128, 256, 256, 512, 512]],
                  'score': 128}
@@ -63,17 +56,11 @@ class USRM3(nn.Module):
         y2 = self.conv2(y1)
         y3 = self.conv3(y2)
 
-        # debug
-        # print(x.shape, y1.shape, y2.shape, y3.shape)
-
         y2up = F.interpolate(y3, y2.shape[2:], mode='bilinear', align_corners=True)
         y2 = self.conv_rev1(y2 + y2up)
         y1up = F.interpolate(y2, y1.shape[2:], mode='bilinear', align_corners=True)
         y1 = self.conv_rev2(y1 + y1up)
         y = F.interpolate(y1, x.shape[2:], mode='bilinear', align_corners=True)
-
-        # debug
-        # print(y.shape, y1.shape, y2.shape)
         return self.conv_sum(F.relu(x + y))
 
 
@@ -99,9 +86,6 @@ class USRM4(nn.Module):
         y2 = self.conv2(y1)
         y3 = self.conv3(y2)
         y4 = self.conv4(y3)
-
-        # debug
-        # print(x.shape, y1.shape, y2.shape, y3.shape, y4.shape)
 
         y3up = F.interpolate(y4, y3.shape[2:], mode='bilinear', align_corners=True)
         y3 = self.conv_rev1(y3 + y3up)
@@ -139,9 +123,6 @@ class USRM5(nn.Module):
         y3 = self.conv3(y2)
         y4 = self.conv4(y3)
         y5 = self.conv5(y4)
-
-        # debug
-        # print(x.shape, y1.shape, y2.shape, y3.shape, y4.shape)
 
         y4up = F.interpolate(y5, y4.shape[2:], mode='bilinear', align_corners=True)
         y4 = self.conv_rev1(y4 + y4up)
@@ -182,9 +163,6 @@ class USRM5_2(nn.Module):
         y4 = self.conv4(y3)
         y5 = self.conv5(y4)
 
-        # debug
-        # print(x.shape, y1.shape, y2.shape, y3.shape, y4.shape)
-
         y4up = F.interpolate(y5, y4.shape[2:], mode='bilinear', align_corners=True)
         y4 = self.conv_rev1(y4 + y4up)
         y3up = F.interpolate(y4, y3.shape[2:], mode='bilinear', align_corners=True)
@@ -197,7 +175,6 @@ class USRM5_2(nn.Module):
         return self.conv_sum(F.relu(x + y))
 
 
-# used to do deep supervision
 class ScoreLayers(nn.Module):
     def __init__(self, channel_list):
         super(ScoreLayers, self).__init__()
@@ -216,31 +193,22 @@ class ScoreLayers(nn.Module):
         return x
 
 
-def extra_layer(base_model_cfg, vgg):
-    if base_model_cfg == 'vgg':
-        config = config_vgg
-    elif base_model_cfg == 'resnet':
-        config = config_resnet
+def extra_layer(base_model_cfg, resnet):
+    config = config_resnet
     convert_layers, score_layers = [], []
     convert_layers = ConvertLayer(config['convert'])
     score_layers = ScoreLayers(config['convert'][1])
-    return vgg, convert_layers, score_layers
+    return resnet, convert_layers, score_layers
 
 
-# TODO： 1.try deep supervision; 2. try to use warm-up strategy to train
-#  In previous methods, backbone max lr=0.05 and other parts lr=0.005
-class AGBNet(nn.Module):
+class BPFINet(nn.Module):
     def __init__(self, base_model_cfg, base, convert_layers, score_layers):
-        super(AGBNet, self).__init__()
+        super(BPFINet, self).__init__()
         self.base_model_cfg = base_model_cfg
         self.base = base
         self.score = score_layers
-        if base_model_cfg == 'vgg':
-            self.config = config_vgg
-        elif base_model_cfg == 'resnet':
-            self.config = config_resnet
-        if self.base_model_cfg == 'resnet':
-            self.convert = convert_layers
+        self.config = config_resnet
+        self.convert = convert_layers
         self.usrm3_1 = USRM3(self.config['convert'][1][4])
         self.usrm3_2 = USRM3(self.config['convert'][1][3])
         self.usrm4 = USRM4(self.config['convert'][1][2])
@@ -267,22 +235,16 @@ class AGBNet(nn.Module):
         C4_att_1 = self.ca41(C4)
         C3 = self.usrm4(C3, C4_att_3)
         C3_att_2 = self.ca32(C3)
-        C2_Pre = C3_att_2.detach()
         C2 = self.usrm5_1(C2, C3_att_2, C4_att_2)
-        C2_Aft = C2.detach()
         C2_att_1 = self.ca21(C2)
-        C2_att = C2_att_1.detach()
         C1 = self.usrm5_2(C1, C2_att_1, C4_att_1)
+
         C1, C2, C3, C4, C5 = self.score([C1, C2, C3, C4, C5], x_size)
         return C1, C2, C3, C4, C5
-        # return C2_Pre, C2_Aft, C2_att
 
 
 def build_model(base_model_cfg='resnet'):
-    if base_model_cfg == 'vgg':
-        return AGBNet(base_model_cfg, *extra_layer(base_model_cfg, vgg16()))
-    elif base_model_cfg == 'resnet':
-        return AGBNet(base_model_cfg, *extra_layer(base_model_cfg, resnet50()))
+    return BPFINet(base_model_cfg, *extra_layer(base_model_cfg, resnet50()))
 
 
 def weights_init(m):
@@ -299,23 +261,3 @@ def print_network(model, name):
     print(name)
     print(model)
     print("The number of parameters: {}".format(num_params))
-
-
-if __name__ == '__main__':
-    import time
-
-    model = build_model(base_model_cfg='resnet')
-    print_network(model, 'AGBNet')
-    img = torch.randn(1, 3, 352, 352)
-    model = model.cuda()
-    img = img.cuda()
-    with torch.no_grad():
-        start = time.time()
-        res = model(img)
-        # for i in range(10):
-        #     res = model(img)
-        torch.cuda.synchronize()
-        end = time.time()
-        for i in res:
-            print(i.shape)
-        print(end - start)
