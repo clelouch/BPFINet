@@ -27,9 +27,9 @@ python deep_supervision_main.py
 ```
  python deep_supervision_main.py --mode=test 
 ```
-We provide the trained model file ([Baidu](https://drive.google.com/file/d/1bXERDgTKfzkZfXKs8z5vj1QNM3zL-QTL/view?usp=sharing)) [code:]
+We provide the trained model file ([Baidu](https://pan.baidu.com/s/15n6U0YfPJJBdH5FuPmUeaQ)) [code:c4pm]
 
-The saliency maps are also available ([Baidu](https://drive.google.com/file/d/1sIqEKDCi_rSY4t1THPlBSyAd05F2ve_Q/view?usp=sharing)). [code:]
+The saliency maps are also available ([Baidu](https://pan.baidu.com/s/12KoIhp28v8sk1KBwFlXC0g)). [code:sbre]
 
 ## Citation
 Please cite the `BPFINet` in your publications if it helps your research:
