@@ -1,17 +1,11 @@
 import torch
-from collections import OrderedDict
-from torch.nn import utils, functional as F
 from torch.optim import Adam
-from torch.backends import cudnn
 from deep_supervision_model import build_model, weights_init
-import scipy.misc as sm
 import numpy as np
 import os
-import torchvision.utils as vutils
 import cv2
-import math
-import time
 from loss import TriLoss
+
 
 # normalize the predicted SOD probability map
 def normPRED(d):
@@ -22,7 +16,7 @@ def normPRED(d):
     return dn
 
 
-Dataset_dict = {'e': 'ECSSD', 'p': 'PASCALS', 'd': 'DUTOMRON', 'h': 'HKU-IS','s': 'SOD','t': 'DUTS_TE'}
+Dataset_dict = {'e': 'ECSSD', 'p': 'PASCALS', 'd': 'DUTOMRON', 'h': 'HKU-IS', 's': 'SOD', 't': 'DUTS_TE'}
 
 
 class Solver(object):
@@ -33,8 +27,10 @@ class Solver(object):
         self.iter_size = config.iter_size
         self.show_every = config.show_every
         self.lr_decay_epoch = [20, ]
-        self.build_model()
+
         self.loss = TriLoss(sigma=self.config.sigma, n=self.config.weight)
+        self.build_model()
+
         if config.mode == 'test':
             print('Loading pre-trained model from %s...' % self.config.model)
             if self.config.cuda:
@@ -52,12 +48,20 @@ class Solver(object):
         print(model)
         print("The number of parameters: {}".format(num_params))
 
+    def deep_supervision_loss_old(self, preds, gt):
+        losses = []
+        for pred in preds:
+            wbce_, iou_, rev_iou_ = self.loss(pred, gt)
+            losses.append((wbce_ + 0.5 * (iou_ + rev_iou_)).mean())
+        sum_loss = losses[0] + losses[1] / 2 + losses[2] / 4 + losses[3] / 8 + losses[4] / 8
+        return sum_loss
+
     def deep_supervision_loss(self, preds, gt):
         losses = []
         for pred in preds:
             wbce_, iou_, rev_iou_ = self.loss(pred, gt)
             losses.append((wbce_ + 0.5 * (iou_ + rev_iou_)).mean())
-        sum_loss = losses[0] + losses[1] / 2 + losses[2] / 4 + losses[3] /8 + losses[4] / 8
+        sum_loss = losses[0] + losses[1] / 2 + losses[2] / 4 + losses[3] / 8 + losses[4] / 8
         return sum_loss
 
     # build the network
@@ -65,9 +69,7 @@ class Solver(object):
         self.net = build_model(self.config.arch)
         if self.config.cuda:
             self.net = self.net.cuda()
-
         self.net.train()
-        # self.net.eval()  # use_global_stats = True
         self.net.apply(weights_init)
         if self.config.load == '':
             self.net.base.load_state_dict(torch.load(self.config.pretrained_model))
@@ -77,9 +79,11 @@ class Solver(object):
         self.lr = self.config.lr
         self.wd = self.config.wd
 
-        self.optimizer = Adam(filter(lambda p: p.requires_grad, self.net.parameters()), lr=self.lr,
-                              weight_decay=self.wd)
-        # self.print_network(self.net, 'AGBNet Structure')
+        param1 = [p for p in self.net.parameters() if p.requires_grad]
+        param2 = [p for p in self.loss.parameters() if p.requires_grad]
+        param = param1 + param2
+
+        self.optimizer = Adam(param, lr=self.lr, weight_decay=self.wd)
 
     def test(self):
         self.net.eval()
@@ -120,8 +124,6 @@ class Solver(object):
                 self.optimizer.step()
 
                 if i % (self.show_every // self.config.batch_size) == 0:
-                    if i == 0:
-                        x_showEvery = 1
                     print(
                         'epoch: [%2d/%2d], iter: [%5d/%5d]  ||  sum_loss : %10.4f' % (
                             epoch, self.config.epoch, i, iter_num, sum_loss.data))
@@ -132,7 +134,9 @@ class Solver(object):
 
             if epoch in self.lr_decay_epoch:
                 self.lr = self.lr * 0.1
-                self.optimizer = Adam(filter(lambda p: p.requires_grad, self.net.parameters()), lr=self.lr,
-                                      weight_decay=self.wd)
+                param1 = [p for p in self.net.parameters() if p.requires_grad]
+                param2 = [p for p in self.loss.parameters() if p.requires_grad]
+                param = param1 + param2
+                self.optimizer = Adam(param, lr=self.lr, weight_decay=self.wd)
 
         torch.save(self.net.state_dict(), '%s/models/final.pth' % self.config.save_folder)
