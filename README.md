@@ -19,6 +19,7 @@ OpenCV-Python
 ```
 
 ## Training
+pretrained resnet50 is available at ([Baidu](https://pan.baidu.com/s/1K4-b6JPi6E34kgH8gdbYqQ)) [code:nfih]
 ```
 python deep_supervision_main.py 
 ```
@@ -41,3 +42,5 @@ Please cite the `BPFINet` in your publications if it helps your research:
   year = {2021},
 }
 ```
+## Reference
+[poolnet](https://github.com/backseason/PoolNet)
